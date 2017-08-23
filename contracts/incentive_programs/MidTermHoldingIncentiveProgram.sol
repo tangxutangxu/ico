@@ -92,7 +92,8 @@ contract MidTermHoldingIncentiveProgram {
     function close() public {
         require(!closed);
         require(msg.sender == OWNER);
-        require(now > depositStopTime + MAX_WITHDRAWAL_DELAY);
+        // TODO(kongliang): Remove this for testing.
+        require(now > depositStopTime + MAX_WITHDRAWAL_DELAY); 
 
         var ethAmount = this.balance;
         if (!OWNER.send(this.balance)) throw;
