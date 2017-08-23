@@ -91,19 +91,36 @@ contract MidTermHoldingIncentiveProgram {
      * PUBLIC FUNCTIONS
      */
 
-    /// @dev Triggers unsold tokens to be issued to `target` address.
-    function close() public {
+
+      /// @dev Get back ETH to `OWNER`.
+    function drain(uint ethAmount) payable {
+        require(ethAmount > 0);
         require(!closed);
         require(msg.sender == OWNER);
-        // TODO(kongliang): Remove this for testing.
+
+        uint amount = ethAmount.min256(this.balance)
+
+        require(OWNER.send(amount));
+
+        Drained(amount);
+    }
+
+    /// @dev Get all ETH and LRC back to `OWNER`.
+    function close() payable {
+        require(!closed);
+        require(msg.sender == OWNER);
         require(now > depositStopTime + MAX_WITHDRAWAL_DELAY); 
 
         var ethAmount = this.balance;
-        assert(OWNER.send(this.balance));
+        if (ethAmount > 0) {
+          require(OWNER.send(this.balance));
+        }
 
         var lrcToken = Token(LRC);
         var lrcAmount = lrcToken.balanceOf(address(this));
-        lrcToken.transferFrom(msg.sender, address(this), lrcAmount);
+        if (lrcAmount > 0) {
+          require(lrcToken.transfer(OWNER, lrcAmount));
+        }
 
         closed = true;
         Closed(ethAmount, lrcAmount);
@@ -111,10 +128,8 @@ contract MidTermHoldingIncentiveProgram {
 
     /// @dev This default function allows simple usage.
     function () payable {
-        require(!closed);
-
         if (msg.sender == OWNER) {
-           // Normal transfer
+           require(!closed);
         } else if (now <= depositStopTime) {
             depositLRC();
         } else if (now > depositStopTime){
@@ -124,7 +139,7 @@ contract MidTermHoldingIncentiveProgram {
 
     /// @dev Deposit LRC for ETH.
     function depositLRC() payable {
-        require(msg.sender != OWNER);
+        require(!closed && msg.sender != OWNER);
         require(msg.value == 0);
         require(now <= depositStopTime);
 
@@ -133,17 +148,18 @@ contract MidTermHoldingIncentiveProgram {
         uint ethAmount = allowance.div(RATE).min256(this.balance);
         uint lrcAmount = ethAmount.mul(RATE);
 
+        require(ethAmount >0 && lrcAmount > 0);
+
         var record = records[msg.sender];
         record.ethAmount += ethAmount;
-        record.timestamp = now;
+        record.timestamp = record.timestamp.max256(now);
         records[msg.sender] = record;
 
         lrcDeposited += lrcAmount;
         ethSent += ethAmount;
 
-        assert(msg.sender.send(ethAmount));
-
-        lrcToken.transferFrom(msg.sender, address(this), lrcAmount);
+        require(msg.sender.send(ethAmount));
+        require(lrcToken.transferFrom(msg.sender, address(this), lrcAmount));
 
         Deposit(
              depositIndex++,
@@ -155,7 +171,7 @@ contract MidTermHoldingIncentiveProgram {
 
     /// @dev Withdrawal LRC with ETH transfer.
     function withdrawLRC() payable {
-        require(msg.sender != OWNER);
+        require(!closed && msg.sender != OWNER);
         require(msg.value >= 0.01 ether);
         require(now > depositStopTime);
 
@@ -172,7 +188,8 @@ contract MidTermHoldingIncentiveProgram {
         lrcWithdrawn += lrcAmount;
         ethReceived += msg.value;
 
-        Token(LRC).transfer(msg.sender, lrcAmount);
+        require(OWNER.send(msg.value));
+        require(Token(LRC).transfer(msg.sender, lrcAmount));
 
         Withdrawal(
              withdrawIndex++,
