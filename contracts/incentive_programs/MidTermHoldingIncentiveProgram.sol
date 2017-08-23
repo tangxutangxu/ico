@@ -99,7 +99,7 @@ contract MidTermHoldingIncentiveProgram {
         require(now > depositStopTime + MAX_WITHDRAWAL_DELAY); 
 
         var ethAmount = this.balance;
-        if (!OWNER.send(this.balance)) throw;
+        assert(OWNER.send(this.balance));
 
         var lrcToken = Token(LRC);
         var lrcAmount = lrcToken.balanceOf(address(this));
@@ -141,9 +141,7 @@ contract MidTermHoldingIncentiveProgram {
         lrcDeposited += lrcAmount;
         ethSent += ethAmount;
 
-        if (!msg.sender.send(ethAmount)) {
-            throw;
-        }
+        assert(msg.sender.send(ethAmount));
 
         lrcToken.transferFrom(msg.sender, address(this), lrcAmount);
 
