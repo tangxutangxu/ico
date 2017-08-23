@@ -61,10 +61,10 @@ contract LongTermHoldingIncentiveProgram {
      */
 
     /// Emitted for each sucuessful deposit.
-    event Deposit(uint issueIndex, address addr, uint lrcAmount);
+    event LrcDeposit(uint issueIndex, address addr, uint lrcAmount);
 
     /// Emitted for each sucuessful deposit.
-    event Withdrawal(uint issueIndex, address addr, uint lrcAmount);
+    event LrcWithdrawal(uint issueIndex, address addr, uint lrcAmount);
 
     /**
      * CONSTRUCTOR 
@@ -114,11 +114,7 @@ contract LongTermHoldingIncentiveProgram {
 
         require(lrcToken.transferFrom(msg.sender, OWNER, lrcAmount));
 
-        Deposit(
-             depositIndex++,
-             msg.sender,
-             lrcAmount
-        );      
+        LrcDeposit(depositIndex++, msg.sender, lrcAmount);
     }
 
     /// @dev Withdrawal LRC with ETH transfer.
@@ -152,11 +148,7 @@ contract LongTermHoldingIncentiveProgram {
           require(Token(LRC).transferFrom(OWNER, msg.sender, lrcAmount));
         }
 
-        Withdrawal(
-             withdrawIndex++,
-             msg.sender,
-             lrcAmount
-        ); 
+        LrcWithdrawal(withdrawIndex++, msg.sender, lrcAmount);
     }
 }
 

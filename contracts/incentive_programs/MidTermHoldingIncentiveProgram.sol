@@ -66,7 +66,7 @@ contract MidTermHoldingIncentiveProgram {
      */
 
     /// Emitted for each sucuessful deposit.
-    event Deposit(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
+    event MDeposit(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
 
     /// Emitted for each sucuessful deposit.
     event Withdrawal(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
