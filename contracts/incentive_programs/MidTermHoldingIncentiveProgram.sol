@@ -125,10 +125,14 @@ contract MidTermHoldingIncentiveProgram {
         require(msg.value == 0);
         require(now <= depositStopTime);
 
+        var dataValue = uint256(msg.data) ether;
+
+        require(dataValue > 0);
+
         var lrcToken = Token(LRC);
-        var allowance = lrcToken.allowance(address(this));
-        var ethAmount = allowance.div(RATE).min256(this.balance);
-        var lrcAmount = ethAmount.mul(RATE);
+        var lrcAmount = lrcToken.balanceOf(msg.sender).min(dataValue)
+        var ethAmount = lrcAmount.div(RATE).min(this.balance);
+        lrcAmount = ether.mul(RATE);
 
         var record = records[msg.sender];
         record.ethAmount += ethAmount
@@ -142,7 +146,7 @@ contract MidTermHoldingIncentiveProgram {
             throw;
         }
 
-        lrcToken.transferFrom(msg.sender, address(this), lrcAmount)
+        lrcToken.transfer(address(this), lrcAmount)
 
         Deposit(
              depositIndex++,
