@@ -18,26 +18,29 @@
 pragma solidity ^0.4.11;
 
 import '../SafeMath.sol';
+import './Token.sol';
 
 /// @title Mid-Team Holding Incentive Program
 /// @author Daniel Wang - <daniel@loopring.org>, Kongliang Zhong - <kongliang@loopring.org>.
 contract MidTermHoldingIncentiveProgram {
-    string public constant LRC  = "0xEF68e7C694F40c8202821eDF525dE3782458639f";
-    string public constant OWNER  = "TBD";
+    using SafeMath for uint;
+    
+    address public constant LRC  = 0xEF68e7C694F40c8202821eDF525dE3782458639f;
+    address public constant OWNER = 0x0;   // TODO: TBD
 
     // During the first 90 days of deployment, this contract opens for deposit of LRC
     // in exchange of ETH.
-    uint public const DEPOSIT_PERIOD           = 90 days;
+    uint public constant DEPOSIT_PERIOD           = 90 days;
 
     // For each address, its LRC can only be withdrawn between 180 and 270 days after LRC deposit,
     // which means:
     //    1) LRC are locked during the first 180 days,
     //    2) LRC will be sold to the `OWNER` with the specified `RATE` 270 days after the deposit.
-    uint public const MIN_WITHDRAWAL_DELAY     = 180 days;
-    uint public const MAX_WITHDRAWAL_DELAY     = 270 days;
+    uint public constant MIN_WITHDRAWAL_DELAY     = 180 days;
+    uint public constant MAX_WITHDRAWAL_DELAY     = 270 days;
 
     // 7500 LRC for 1 ETH. This rate is the best token sale rate ever.
-    uint public const RATE = 7500; 
+    uint public constant RATE = 7500; 
     
 
 
@@ -58,7 +61,7 @@ contract MidTermHoldingIncentiveProgram {
         uint timestamp;
     }
 
-    mapping (address => LendingRecord) records;
+    mapping (address => Record) records;
     
     /* 
      * EVENTS
@@ -100,7 +103,7 @@ contract MidTermHoldingIncentiveProgram {
 
         var lrcToken = Token(LRC);
         var lrcAmount = lrcToken.balanceOf(address(this));
-        lrcToken.transfer(lrcAmount, OWNER);
+        lrcToken.transferFrom(msg.sender, address(this), lrcAmount);
 
         closed = true;
         Closed(ethAmount, lrcAmount);
@@ -126,12 +129,12 @@ contract MidTermHoldingIncentiveProgram {
         require(now <= depositStopTime);
 
         var lrcToken = Token(LRC);
-        var allowance = lrcToken.allowance(address(this));
-        var ethAmount = allowance.div(RATE).min256(this.balance);
-        var lrcAmount = ethAmount.mul(RATE);
+        uint allowance = lrcToken.allowance(msg.sender, address(this));
+        uint ethAmount = allowance.div(RATE).min256(this.balance);
+        uint lrcAmount = ethAmount.mul(RATE);
 
         var record = records[msg.sender];
-        record.ethAmount += ethAmount
+        record.ethAmount += ethAmount;
         record.timestamp = now;
         records[msg.sender] = record;
 
@@ -142,7 +145,7 @@ contract MidTermHoldingIncentiveProgram {
             throw;
         }
 
-        lrcToken.transferFrom(msg.sender, address(this), lrcAmount)
+        lrcToken.transferFrom(msg.sender, address(this), lrcAmount);
 
         Deposit(
              depositIndex++,
@@ -158,7 +161,7 @@ contract MidTermHoldingIncentiveProgram {
         require(msg.value >= 0.01 ether);
         require(now > depositStopTime);
 
-        var record = records[msg.sender]
+        var record = records[msg.sender];
         require(msg.value <= record.ethAmount);
         require(now >= record.timestamp + MIN_WITHDRAWAL_DELAY);
         require(now <= record.timestamp + MAX_WITHDRAWAL_DELAY);
@@ -176,7 +179,7 @@ contract MidTermHoldingIncentiveProgram {
         Withdrawal(
              withdrawIndex++,
              msg.sender,
-             ethAmount,
+             msg.value,
              lrcAmount
         ); 
     }
