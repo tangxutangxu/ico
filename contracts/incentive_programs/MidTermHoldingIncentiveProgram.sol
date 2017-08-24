@@ -95,11 +95,11 @@ contract MidTermHoldingIncentiveProgram {
         require(!closed);
         require(msg.sender == OWNER);
 
-        uint amount = ethAmount.min256(this.balance)
+        uint amount = ethAmount.min256(this.balance);
 
         require(OWNER.send(amount));
 
-        Drained(amount);
+        //Drained(amount);
     }
 
     /// @dev Get all ETH and LRC back to `OWNER`.
@@ -161,7 +161,7 @@ contract MidTermHoldingIncentiveProgram {
         require(msg.sender.send(ethAmount));
         require(lrcToken.transferFrom(msg.sender, address(this), lrcAmount));
 
-        Deposit(
+        MDeposit(
              depositIndex++,
              msg.sender,
              ethAmount,

@@ -97,7 +97,7 @@ contract LongTermHoldingIncentiveProgram {
         require(msg.sender != OWNER);
         require(msg.value == 0);
         require(now <= depositStopTime);
-
+        
         var lrcToken = Token(LRC);
         uint lrcAmount = lrcToken
             .allowance(msg.sender, address(this))
@@ -124,31 +124,33 @@ contract LongTermHoldingIncentiveProgram {
         require(now > depositStopTime);
 
         var record = records[msg.sender];
-        require(now >= record.timestamp + MIN_WITHDRAWAL_DELAY);
-        require(now <= record.timestamp + MAX_WITHDRAWAL_DELAY);
+        require(now >= record.timestamp + LOCKDOWN_PERIOD);
+        require(now <= record.timestamp + LOCKDOWN_PERIOD + WITHDRAWAL_PERIOD);
 
 
         var lrcToken = Token(LRC);
         uint lrcTotal = lrcToken
             .allowance(OWNER, address(this))
-            .min256(lrcTotal.balanceOf(OWNER));
+            .min256(lrcToken.balanceOf(OWNER));
 
         require(lrcTotal > 0);
         require(lrcDeposited > 0);
-        require(record.ethAmount > 0);
+        require(record.lrcAmount > 0);
 
-        uint lrcAmount = lrcTotal.div(lrcDeposited).mul(record.ethAmount);
+        uint lrcAmount = lrcTotal.div(lrcDeposited).mul(record.lrcAmount);
 
-        record.ethAmount = 0;
+        record.lrcAmount = 0;
         records[msg.sender] = record;
 
         lrcWithdrawn += lrcAmount;
 
         if (lrcAmount > 0)
-          require(Token(LRC).transferFrom(OWNER, msg.sender, lrcAmount));
-        }
+            require(Token(LRC).transferFrom(OWNER, msg.sender, lrcAmount));
 
         LrcWithdrawal(withdrawIndex++, msg.sender, lrcAmount);
     }
+
+    
 }
+
 
