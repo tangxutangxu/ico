@@ -26,7 +26,6 @@ contract LongTermHoldingIncentiveProgram {
     using SafeMath for uint;
     
     address public constant LRC  = 0xEF68e7C694F40c8202821eDF525dE3782458639f;
-    
 
     // During the first 90 days of deployment, this contract opens for deposit of LRC
     // in exchange of ETH.

@@ -25,7 +25,7 @@ import './Token.sol';
 contract MidTermHoldingIncentiveProgram {
     using SafeMath for uint;
     
-    address public constant LRC  = 0xEF68e7C694F40c8202821eDF525dE3782458639f;
+    
 
     // During the first 90 days of deployment, this contract opens for deposit of LRC
     // in exchange of ETH.
@@ -43,6 +43,7 @@ contract MidTermHoldingIncentiveProgram {
     // 7500 LRC for 1 ETH. This rate is the best token sale rate ever.
     uint public constant RATE = 7500; 
 
+    address public lrcAddress  = 0x0;
     address public owner = 0x0;
 
     // Some stats
@@ -86,9 +87,13 @@ contract MidTermHoldingIncentiveProgram {
      * @dev Initialize the contract
      * Deposit period start right after this contract is deployed.
      */
-    function MidTermHoldingIncentiveProgram(address _owner) {
+    function MidTermHoldingIncentiveProgram(address _lrcAddress, address _owner) {
+        require(_lrcAddress != 0x0);
         require(_owner != 0x0);
+
+        lrcAddress = _lrcAddress;
         owner = _owner;
+
         depositStartTime = now;
         depositStopTime = depositStartTime + DEPOSIT_PERIOD;
     }
@@ -119,7 +124,7 @@ contract MidTermHoldingIncentiveProgram {
           require(owner.send(ethAmount));
         }
 
-        var lrcToken = Token(LRC);
+        var lrcToken = Token(lrcAddress);
         var lrcAmount = lrcToken.balanceOf(address(this));
         if (lrcAmount > 0) {
           require(lrcToken.transfer(owner, lrcAmount));
@@ -148,7 +153,7 @@ contract MidTermHoldingIncentiveProgram {
 
         uint lrcAmount = bytesToUint(msg.data).mul(1E18);
         
-        var lrcToken = Token(LRC);
+        var lrcToken = Token(lrcAddress);
         lrcAmount = lrcToken.balanceOf(msg.sender).min256(lrcAmount);
 
         uint ethAmount = lrcAmount.div(RATE).min256(this.balance);
@@ -195,7 +200,7 @@ contract MidTermHoldingIncentiveProgram {
         ethReceived += msg.value;
 
         require(owner.send(msg.value));
-        require(Token(LRC).transfer(msg.sender, lrcAmount));
+        require(Token(lrcAddress).transfer(msg.sender, lrcAmount));
 
         MWithdrawal(
              withdrawIndex++,
