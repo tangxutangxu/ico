@@ -26,7 +26,7 @@ contract LongTermHoldingIncentiveProgram {
     using SafeMath for uint;
     
     address public constant LRC  = 0xEF68e7C694F40c8202821eDF525dE3782458639f;
-    address public constant OWNER = 0x0;   // TODO: TBD
+    
 
     // During the first 90 days of deployment, this contract opens for deposit of LRC
     // in exchange of ETH.
@@ -35,9 +35,11 @@ contract LongTermHoldingIncentiveProgram {
     // For each address, its LRC can only be withdrawn between 180 and 270 days after LRC deposit,
     // which means:
     //    1) LRC are locked during the first 180 days,
-    //    2) LRC will be sold to the `OWNER` with the specified `RATE` 270 days after the deposit.
+    //    2) LRC will be sold to the `owner` with the specified `RATE` 270 days after the deposit.
     uint public constant LOCKDOWN_PERIOD     = 360 days;
     uint public constant WITHDRAWAL_PERIOD   = 180 days;
+
+    address public  owner = 0x0;
 
     // Some stats
     uint public lrcDeposited        = 0;
@@ -72,7 +74,9 @@ contract LongTermHoldingIncentiveProgram {
      * @dev Initialize the contract
      * Deposit period start right after this contract is deployed.
      */
-    function LongTermHoldingIncentiveProgram() {
+    function LongTermHoldingIncentiveProgram(address _owner) {
+        require(_owner != 0x0);
+        owner = _owner;
         depositStartTime = now;
         depositStopTime = depositStartTime + DEPOSIT_PERIOD;
     }
@@ -83,7 +87,7 @@ contract LongTermHoldingIncentiveProgram {
 
     /// @dev This default function allows simple usage.
     function () payable {
-        require(msg.sender != OWNER);
+        require(msg.sender != owner);
 
         if (now <= depositStopTime) {
             depositLRC();
@@ -94,7 +98,7 @@ contract LongTermHoldingIncentiveProgram {
 
     /// @dev Deposit LRC for ETH.
     function depositLRC() payable {
-        require(msg.sender != OWNER);
+        require(msg.sender != owner);
         require(msg.value == 0);
         require(now <= depositStopTime);
         
@@ -112,14 +116,14 @@ contract LongTermHoldingIncentiveProgram {
 
         lrcDeposited += lrcAmount;
 
-        require(lrcToken.transferFrom(msg.sender, OWNER, lrcAmount));
+        require(lrcToken.transferFrom(msg.sender, owner, lrcAmount));
 
         LrcDeposit(depositIndex++, msg.sender, lrcAmount);
     }
 
     /// @dev Withdrawal LRC with ETH transfer.
     function withdrawLRC() payable {
-        require(msg.sender != OWNER);
+        require(msg.sender != owner);
         require(msg.value == 0);
         require(now > depositStopTime);
 
@@ -130,8 +134,8 @@ contract LongTermHoldingIncentiveProgram {
 
         var lrcToken = Token(LRC);
         uint lrcTotal = lrcToken
-            .allowance(OWNER, address(this))
-            .min256(lrcToken.balanceOf(OWNER));
+            .allowance(owner, address(this))
+            .min256(lrcToken.balanceOf(owner));
 
         require(lrcTotal > 0);
         require(lrcDeposited > 0);
@@ -145,7 +149,7 @@ contract LongTermHoldingIncentiveProgram {
         lrcWithdrawn += lrcAmount;
 
         if (lrcAmount > 0)
-            require(Token(LRC).transferFrom(OWNER, msg.sender, lrcAmount));
+            require(Token(LRC).transferFrom(owner, msg.sender, lrcAmount));
 
         LrcWithdrawal(withdrawIndex++, msg.sender, lrcAmount);
     }
