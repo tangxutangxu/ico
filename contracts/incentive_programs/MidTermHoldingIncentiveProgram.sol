@@ -101,18 +101,18 @@ contract MidTermHoldingIncentiveProgram {
      */
 
     /// @dev Get back ETH to `owner`.
-    function drain(uint ethAmount) payable {
+    function drain(uint ethAmount) public payable {
         require(ethAmount > 0);
         require(msg.sender == owner);
 
-        uint amount = ethAmount.min256(this.balance);
+        uint amount = (ethAmount * 1E18).min256(this.balance);
 
         require(owner.send(amount));
         MDrained(amount);
     }
 
     /// @dev Get all ETH and LRC back to `owner`.
-    function close() payable {
+    function close() public payable {
         require(!closed);
         require(msg.sender == owner);
         require(now > depositStopTime + MAX_WITHDRAWAL_DELAY); 
