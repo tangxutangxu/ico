@@ -24,8 +24,6 @@ import './Token.sol';
 /// @author Daniel Wang - <daniel@loopring.org>, Kongliang Zhong - <kongliang@loopring.org>.
 contract MidTermHoldingIncentiveProgram {
     using SafeMath for uint;
-    
-    
 
     // During the first 90 days of deployment, this contract opens for deposit of LRC
     // in exchange of ETH.
