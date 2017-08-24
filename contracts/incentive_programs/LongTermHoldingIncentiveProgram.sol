@@ -25,8 +25,6 @@ import './Token.sol';
 contract LongTermHoldingIncentiveProgram {
     using SafeMath for uint;
     
-    address public constant LRC  = 0xEF68e7C694F40c8202821eDF525dE3782458639f;
-
     // During the first 90 days of deployment, this contract opens for deposit of LRC
     // in exchange of ETH.
     uint public constant DEPOSIT_PERIOD           = 60 days;
@@ -38,7 +36,8 @@ contract LongTermHoldingIncentiveProgram {
     uint public constant LOCKDOWN_PERIOD     = 360 days;
     uint public constant WITHDRAWAL_PERIOD   = 180 days;
 
-    address public  owner = 0x0;
+    address public lrcAddress = 0x0;
+    address public owner = 0x0;
 
     // Some stats
     uint public lrcDeposited        = 0;
@@ -73,9 +72,13 @@ contract LongTermHoldingIncentiveProgram {
      * @dev Initialize the contract
      * Deposit period start right after this contract is deployed.
      */
-    function LongTermHoldingIncentiveProgram(address _owner) {
+    function LongTermHoldingIncentiveProgram(address _lrcAddress, address _owner) {
+        require(_lrcAddress != 0x0);
         require(_owner != 0x0);
+
+        lrcAddress = _lrcAddress;
         owner = _owner;
+        
         depositStartTime = now;
         depositStopTime = depositStartTime + DEPOSIT_PERIOD;
     }
@@ -101,7 +104,7 @@ contract LongTermHoldingIncentiveProgram {
         require(msg.value == 0);
         require(now <= depositStopTime);
         
-        var lrcToken = Token(LRC);
+        var lrcToken = Token(lrcAddress);
         uint lrcAmount = lrcToken
             .allowance(msg.sender, address(this))
             .min256(lrcToken.balanceOf(msg.sender));
@@ -131,7 +134,7 @@ contract LongTermHoldingIncentiveProgram {
         require(now <= record.timestamp + LOCKDOWN_PERIOD + WITHDRAWAL_PERIOD);
 
 
-        var lrcToken = Token(LRC);
+        var lrcToken = Token(lrcAddress);
         uint lrcTotal = lrcToken
             .allowance(owner, address(this))
             .min256(lrcToken.balanceOf(owner));
@@ -148,7 +151,7 @@ contract LongTermHoldingIncentiveProgram {
         lrcWithdrawn += lrcAmount;
 
         if (lrcAmount > 0)
-            require(Token(LRC).transferFrom(owner, msg.sender, lrcAmount));
+            require(Token(lrcAddress).transferFrom(owner, msg.sender, lrcAmount));
 
         LrcWithdrawal(withdrawIndex++, msg.sender, lrcAmount);
     }
