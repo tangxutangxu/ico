@@ -40,7 +40,6 @@ contract LRCMidTermHoldingContract {
 
     // 7500 LRC for 1 ETH. This rate is the best token sale rate ever.
     uint public constant RATE       = 7500; 
-    uint public constant FEE_FACTOR = 100;
 
     address public lrcTokenAddress  = 0x0;
     address public owner            = 0x0;
@@ -57,7 +56,7 @@ contract LRCMidTermHoldingContract {
     bool public closed              = false;
 
     struct Record {
-        uint ethAmount;
+        uint lrcAmount;
         uint timestamp;
     }
 
@@ -151,30 +150,28 @@ contract LRCMidTermHoldingContract {
     /// the user's address and send `x * 100` ETH to the user.
     function depositLRC() payable {
         require(!closed && msg.sender != owner);
-        require(msg.value > 0);
+        require(msg.value == 0);
         require(now <= depositStopTime);
 
         var record = records[msg.sender];
         var lrcToken = Token(lrcTokenAddress);
 
-        var ethAmount = this.balance
-            .min256(lrcToken.balanceOf(msg.sender).div(RATE))
-            .min256(lrcToken.allowance(msg.sender, address(this)).div(RATE))
-            .min256(MAX_LRC_DEPOSIT_PER_ADDRESS.div(RATE) - record.ethAmount)
-            .min256(msg.value.mul(FEE_FACTOR));
+        var lrcAmount = this.balance.mul(RATE)
+            .min256(lrcToken.balanceOf(msg.sender))
+            .min256(lrcToken.allowance(msg.sender, address(this)))
+            .min256(MAX_LRC_DEPOSIT_PER_ADDRESS - record.lrcAmount);
 
-        require(ethAmount > 0);
+        var ethAmount = lrcAmount.div(RATE);
+        require(lrcAmount > 0 && ethAmount > 0);
 
-        record.ethAmount += ethAmount;
+        record.lrcAmount += lrcAmount;
         record.timestamp = now;
         records[msg.sender] = record;
-
-        var lrcAmount = ethAmount.mul(RATE);
 
         lrcDeposited += lrcAmount;
         ethSent += ethAmount;
 
-        require(msg.sender.send(ethAmount + msg.value - ethAmount.div(FEE_FACTOR)));
+        require(msg.sender.send(ethAmount));
         require(lrcToken.transferFrom(msg.sender, address(this), lrcAmount));
 
         Deposit(
@@ -195,21 +192,21 @@ contract LRCMidTermHoldingContract {
         require(now >= record.timestamp + WITHDRAWAL_DELAY);
         require(now <= record.timestamp + WITHDRAWAL_DELAY + WITHDRAWAL_WINDOW);
 
-        require(msg.value <= record.ethAmount);
-
-        uint ethAmount = msg.value
-            .min256(record.ethAmount)
-            .min256(this.balance);
-
-        record.ethAmount -= ethAmount;
-        records[msg.sender] = record;
+        uint ethAmount = msg.value.min256(record.lrcAmount.div(RATE));
 
         var lrcAmount = ethAmount.mul(RATE);
+
+        record.lrcAmount -= lrcAmount;
+        if (record.lrcAmount == 0) {
+            delete records[msg.sender];
+        } else {
+            records[msg.sender] = record;
+        }
 
         lrcWithdrawn += lrcAmount;
         ethReceived += ethAmount;
 
-        require(owner.send(msg.value));
+        require(owner.send(ethAmount));
         require(Token(lrcTokenAddress).transfer(msg.sender, lrcAmount));
 
         uint ethToReturn = msg.value - ethAmount;
