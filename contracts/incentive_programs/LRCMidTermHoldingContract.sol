@@ -22,7 +22,7 @@ import './Token.sol';
 
 /// @title Mid-Team Holding Incentive Program
 /// @author Daniel Wang - <daniel@loopring.org>, Kongliang Zhong - <kongliang@loopring.org>.
-contract MidTermHoldingIncentiveProgram {
+contract LRCMidTermHoldingContract {
     using SafeMath for uint;
 
     // During the first 90 days of deployment, this contract opens for deposit of LRC
@@ -85,7 +85,7 @@ contract MidTermHoldingIncentiveProgram {
     /// @dev Initialize and start the contract.
     /// @param _lrcTokenAddress LRC ERC20 token address
     /// @param _owner Owner of this contract
-    function MidTermHoldingIncentiveProgram(address _lrcTokenAddress, address _owner) {
+    function LRCMidTermHoldingContract(address _lrcTokenAddress, address _owner) {
         require(_lrcTokenAddress != 0x0);
         require(_owner != 0x0);
 

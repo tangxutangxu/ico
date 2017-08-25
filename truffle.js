@@ -12,7 +12,7 @@ module.exports = {
         host: 'localhost', // Random IP for example purposes (do not use)
         port: 8545,
         network_id: 1, // Ethereum public network
-        // from: '0xdFCA9bF60785A5651b4262755cA60d48EFe6E3CF',
+        from: '0xdFCA9bF60785A5651b4262755cA60d48EFe6E3CF',
         gas: 2000000
         // optional config values:
         // 		gas

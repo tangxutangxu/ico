@@ -1,7 +1,7 @@
 var TestToken = artifacts.require("TestToken");
-var MidTerm = artifacts.require("MidTermHoldingIncentiveProgram");
+var MidTerm = artifacts.require("LRCMidTermHoldingContract");
 
-contract('MidTermHoldingIncentiveProgram', function(accounts) {
+contract('LRCMidTermHoldingContract', function(accounts) {
 
   // it("should allow owner to deposit and drain ETH", function() {
   //   var testToken;
