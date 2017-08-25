@@ -32,10 +32,6 @@ contract LRCLongTermHoldingContract {
     // The bonus is this contract's last LRC balance, which can only increase, but not decrease.
     uint public constant LOCKDOWN_PERIOD            = 540 days; // = 1 year and 6 months
     
-    // 0.01 ETH will authorize deposity of 10000LRC, so if you want to deposit `x` LRC,
-    // send `x / 1000,000` ETH to this contract.
-    uint public constant FEE_FACTOR = 1000000;
-
     address public lrcTokenAddress  = 0x0;
     address public owner            = 0x0;
 
@@ -99,12 +95,12 @@ contract LRCLongTermHoldingContract {
     /// @dev Deposit LRC for ETH.
     function depositLRC() payable {
         require(msg.sender != owner);
-        require(msg.value > 0);
+        require(msg.value == 0);
         require(now <= depositStopTime);
         
         var lrcToken = Token(lrcTokenAddress);
-        uint lrcAmount = msg.value.mul(FEE_FACTOR)
-            .min256(lrcToken.balanceOf(msg.sender))
+        uint lrcAmount = lrcToken
+            .balanceOf(msg.sender)
             .min256(lrcToken.allowance(msg.sender, address(this)));
 
         var record = records[msg.sender];
@@ -121,11 +117,12 @@ contract LRCLongTermHoldingContract {
     /// @dev Withdrawal all LRC.
     function withdrawLRC() payable {
         require(msg.sender != owner);
+        require(msg.value == 0);
         require(lrcDeposited > 0);
 
         var record = records[msg.sender];
-        require(record.lrcAmount > 0);
         require(now >= record.timestamp + LOCKDOWN_PERIOD);
+        require(record.lrcAmount > 0);
 
         var lrcToken = Token(lrcTokenAddress);
         uint lrcAmount = lrcToken
@@ -139,7 +136,6 @@ contract LRCLongTermHoldingContract {
         lrcDeposited -= lrcAmount;
 
         require(lrcToken.transfer(msg.sender, lrcAmount));
-
         Withdrawal(withdrawId++, msg.sender, lrcAmount);
     }
 }
