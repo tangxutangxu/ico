@@ -146,9 +146,25 @@ contract LRCLongTermHoldingContract {
         uint balance = lrcBalance();
        
         // The bonus is non-linear function to incentivize later withdrawal.
-        uint bonus = (balance - lrcDeposited).div(lrcDeposited).mul(_lrcAmount);
+        // bonus = totalBonus * power(_lrcAmount/lrcDeposited, 1.25)
+        uint bonus = (balance - lrcDeposited)
+            .div(lrcDeposited.mul(sqrt(sqrt(lrcDeposited))))
+            .mul(_lrcAmount.mul(sqrt(sqrt(_lrcAmount))));
 
         return balance.min256(_lrcAmount + bonus);
+    }
+
+    function sqrt(uint x) internal returns (uint) {
+        uint y = x;
+        while( true ) {
+            uint z = (y + (x/y))/2;
+            uint w = (z + (x/z))/2;
+            if( w == y) {
+                if( w < y ) return w;
+                else return y;
+            }
+            y = w;
+        }
     }
 }
 
