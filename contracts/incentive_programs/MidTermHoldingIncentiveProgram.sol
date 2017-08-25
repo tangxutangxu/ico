@@ -27,22 +27,23 @@ contract MidTermHoldingIncentiveProgram {
 
     // During the first 90 days of deployment, this contract opens for deposit of LRC
     // in exchange of ETH.
-    uint public constant DEPOSIT_PERIOD           = 90 days;
+    uint public constant DEPOSIT_WINDOW                 = 60 days;
 
     // For each address, its LRC can only be withdrawn between 180 and 270 days after LRC deposit,
     // which means:
     //    1) LRC are locked during the first 180 days,
     //    2) LRC will be sold to the `owner` with the specified `RATE` 270 days after the deposit.
-    uint public constant MIN_WITHDRAWAL_DELAY     = 180 days;
-    uint public constant MAX_WITHDRAWAL_DELAY     = 270 days;
+    uint public constant WITHDRAWAL_DELAY               = 180 days;
+    uint public constant WITHDRAWAL_WINDOW              = 90  days;
 
-    uint public constant MAX_LRC_DEPOSIT     = 150000 ether; // = 20 ETH
+    uint public constant MAX_LRC_DEPOSIT_PER_ADDRESS    = 150000 ether; // = 20 ETH
 
     // 7500 LRC for 1 ETH. This rate is the best token sale rate ever.
-    uint public constant RATE = 7500; 
+    uint public constant RATE       = 7500; 
+    uint public constant FEE_FACTOR = 199;
 
-    address public lrcAddress  = 0x0;
-    address public owner = 0x0;
+    address public lrcTokenAddress  = 0x0;
+    address public owner            = 0x0;
 
     // Some stats
     uint public lrcDeposited        = 0;
@@ -68,32 +69,31 @@ contract MidTermHoldingIncentiveProgram {
      */
 
     /// Emitted for each sucuessful deposit.
-    event MDeposit(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
+    event Deposit(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
 
-    /// Emitted for each sucuessful deposit.
-    event MWithdrawal(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
+    /// Emitted for each sucuessful withdrawal.
+    event Withdrawal(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
 
-    /// When this contract is closed.
-    event MClosed(uint ethAmount, uint lrcAmount);
+    /// Emitted when this contract is closed.
+    event Closed(uint ethAmount, uint lrcAmount);
 
-    /// Emitted when some ETH are drained.
-    event MDrained(uint ethAmount);
+    /// Emitted when ETH are drained.
+    event Drained(uint ethAmount);
 
-    /**
-     * CONSTRUCTOR 
-     * 
-     * @dev Initialize the contract
-     * Deposit period start right after this contract is deployed.
-     */
-    function MidTermHoldingIncentiveProgram(address _lrcAddress, address _owner) {
-        require(_lrcAddress != 0x0);
+    
+    /// CONSTRUCTOR 
+    /// @dev Initialize and start the contract.
+    /// @param _lrcTokenAddress LRC ERC20 token address
+    /// @param _owner Owner of this contract
+    function MidTermHoldingIncentiveProgram(address _lrcTokenAddress, address _owner) {
+        require(_lrcTokenAddress != 0x0);
         require(_owner != 0x0);
 
-        lrcAddress = _lrcAddress;
+        lrcTokenAddress = _lrcTokenAddress;
         owner = _owner;
 
         depositStartTime = now;
-        depositStopTime = depositStartTime + DEPOSIT_PERIOD;
+        depositStopTime  = now + DEPOSIT_WINDOW;
     }
 
     /*
@@ -101,35 +101,36 @@ contract MidTermHoldingIncentiveProgram {
      */
 
     /// @dev Get back ETH to `owner`.
+    /// @param ethAmount Amount of ETH to drain back to owner
     function drain(uint ethAmount) public payable {
         require(ethAmount > 0);
         require(msg.sender == owner);
 
-        uint amount = (ethAmount * 1E18).min256(this.balance);
+        uint amount = ethAmount.min256(this.balance);
 
         require(owner.send(amount));
-        MDrained(amount);
+        Drained(amount);
     }
 
     /// @dev Get all ETH and LRC back to `owner`.
     function close() public payable {
         require(!closed);
         require(msg.sender == owner);
-        require(now > depositStopTime + MAX_WITHDRAWAL_DELAY); 
+        require(now > depositStopTime + WITHDRAWAL_DELAY + WITHDRAWAL_WINDOW); 
 
         var ethAmount = this.balance;
         if (ethAmount > 0) {
           require(owner.send(ethAmount));
         }
 
-        var lrcToken = Token(lrcAddress);
+        var lrcToken = Token(lrcTokenAddress);
         var lrcAmount = lrcToken.balanceOf(address(this));
         if (lrcAmount > 0) {
           require(lrcToken.transfer(owner, lrcAmount));
         }
 
         closed = true;
-        MClosed(ethAmount, lrcAmount);
+        Closed(ethAmount, lrcAmount);
     }
 
     /// @dev This default function allows simple usage.
@@ -143,34 +144,38 @@ contract MidTermHoldingIncentiveProgram {
         }
     }
 
+  
     /// @dev Deposit LRC for ETH.
+    /// If user send x ETH, this method will try to transfer `x * 100 * 6500` LRC from
+    /// the user's address and send `x * 100` ETH to the user.
     function depositLRC() payable {
         require(!closed && msg.sender != owner);
-        require(msg.value == 0);
+        require(msg.value > 0);
         require(now <= depositStopTime);
 
-        uint lrcAmount = bytesToUint(msg.data).mul(1E18);
-        
-        var lrcToken = Token(lrcAddress);
-        lrcAmount = lrcToken.balanceOf(msg.sender).min256(lrcAmount);
-
-        uint ethAmount = lrcAmount.div(RATE).min256(this.balance);
-        lrcAmount = ethAmount.mul(RATE);
-
-        require(ethAmount > 0 && lrcAmount > 0 && lrcAmount <= MAX_LRC_DEPOSIT);
-
         var record = records[msg.sender];
+        var lrcToken = Token(lrcTokenAddress);
+
+        var ethAmount = this.balance
+            .min256(lrcToken.balanceOf(msg.sender).div(RATE))
+            .min256(MAX_LRC_DEPOSIT_PER_ADDRESS.div(RATE) - record.ethAmount)
+            .min256(msg.value.mul(FEE_FACTOR));
+
+        require(ethAmount > 0);
+
         record.ethAmount += ethAmount;
         record.timestamp = now;
         records[msg.sender] = record;
 
+        var lrcAmount = ethAmount.mul(RATE);
+
         lrcDeposited += lrcAmount;
         ethSent += ethAmount;
 
-        require(msg.sender.send(ethAmount));
+        require(msg.sender.send(ethAmount + msg.value - ethAmount.div(FEE_FACTOR)));
         require(lrcToken.transfer(address(this), lrcAmount));
 
-        MDeposit(
+        Deposit(
              depositIndex++,
              msg.sender,
              ethAmount,
@@ -181,42 +186,41 @@ contract MidTermHoldingIncentiveProgram {
     /// @dev Withdrawal LRC with ETH transfer.
     function withdrawLRC() payable {
         require(!closed && msg.sender != owner);
-        require(msg.value >= 0.01 ether);
+        require(msg.value > 0);
         require(now > depositStopTime);
 
         var record = records[msg.sender];
-        require(msg.value <= record.ethAmount);
-        require(now >= record.timestamp + MIN_WITHDRAWAL_DELAY);
-        require(now <= record.timestamp + MAX_WITHDRAWAL_DELAY);
+        require(now >= record.timestamp + WITHDRAWAL_DELAY);
+        require(now <= record.timestamp + WITHDRAWAL_DELAY + WITHDRAWAL_WINDOW);
 
-        record.ethAmount -= msg.value;
+        require(msg.value <= record.ethAmount);
+
+        uint ethAmount = msg.value
+            .min256(record.ethAmount)
+            .min256(this.balance);
+
+        record.ethAmount -= ethAmount;
         records[msg.sender] = record;
 
-        var lrcAmount = msg.value.mul(RATE);
+        var lrcAmount = ethAmount.mul(RATE);
 
         lrcWithdrawn += lrcAmount;
-        ethReceived += msg.value;
+        ethReceived += ethAmount;
 
         require(owner.send(msg.value));
-        require(Token(lrcAddress).transfer(msg.sender, lrcAmount));
+        require(Token(lrcTokenAddress).transfer(msg.sender, lrcAmount));
 
-        MWithdrawal(
+        uint ethToReturn = msg.value - ethAmount;
+        if (ethToReturn > 0) {
+            require(msg.sender.send(ethToReturn));
+        }
+
+        Withdrawal(
              withdrawIndex++,
              msg.sender,
-             msg.value,
+             ethAmount,
              lrcAmount
         ); 
-    }
-
-
-    function bytesToUint(bytes v) constant returns (uint value) {
-        uint d;
-        for (uint i = 0; i < v.length; i++) {
-            d = uint(v[i]);
-            require(d >= 48 && d < 57);
-            value = value * 10 + d - 48;
-        }
-        return value;
     }
 }
 

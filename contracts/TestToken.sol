@@ -33,7 +33,7 @@ contract TestToken is StandardToken {
     function TestToken() {}
 
     /// @dev Issue token.
-    function issueToken(address recipient, uint amount) payable {
+    function issueToken(address recipient, uint amount) public {
         require(amount > 0);
 
         uint tstAmount = amount * 1E18;
