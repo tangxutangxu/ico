@@ -22,6 +22,7 @@ import './Token.sol';
 
 /// @title Long-Team Holding Incentive Program
 /// @author Daniel Wang - <daniel@loopring.org>, Kongliang Zhong - <kongliang@loopring.org>.
+/// For more information, please visit https://loopring.org.
 contract LRCLongTermHoldingContract {
     using SafeMath for uint;
     
@@ -30,13 +31,11 @@ contract LRCLongTermHoldingContract {
 
     // 18 months after deposit, user can withdrawal all its LRC with bonus.
     // The bonus is this contract's last LRC balance, which can only increase, but not decrease.
-    uint public constant LOCKDOWN_PERIOD            = 540 days; // = 1 year and 6 months
+    uint public constant WITHDRAWAL_DELAY           = 540 days; // = 1 year and 6 months
     
     address public lrcTokenAddress  = 0x0;
-    address public owner            = 0x0;
 
     uint public lrcDeposited        = 0;
-
     uint public depositStartTime    = 0;
     uint public depositStopTime     = 0;
 
@@ -61,16 +60,12 @@ contract LRCLongTermHoldingContract {
 
     /// @dev Initialize the contract
     /// @param _lrcTokenAddress LRC ERC20 token address
-    /// @param _owner Owner of this contract
-    function LRCLongTermHoldingContract(address _lrcTokenAddress, address _owner) {
+    function LRCLongTermHoldingContract(address _lrcTokenAddress) {
         require(_lrcTokenAddress != 0x0);
-        require(_owner != 0x0);
 
         lrcTokenAddress = _lrcTokenAddress;
-        owner = _owner;
-        
         depositStartTime = now;
-        depositStopTime = depositStartTime + DEPOSIT_PERIOD;
+        depositStopTime  = depositStartTime + DEPOSIT_PERIOD;
     }
 
     /*
@@ -78,27 +73,19 @@ contract LRCLongTermHoldingContract {
      */
 
     function () payable {
-        require(msg.sender != owner);
         if (now <= depositStopTime) {
             depositLRC();
         } else if (now > depositStopTime){
             withdrawLRC();
         }
     }
-
-    function drain() public payable {
-        require(msg.sender == owner);
-        require(this.balance > 0);
-        require(owner.send(this.balance));
-    }
-
+    /// @return Current LRC balance.
     function lrcBalance() public constant returns (uint) {
         return Token(lrcTokenAddress).balanceOf(address(this));
     }
 
     /// @dev Deposit LRC for ETH.
     function depositLRC() payable {
-        require(msg.sender != owner);
         require(msg.value == 0);
         require(now <= depositStopTime);
         
@@ -106,6 +93,8 @@ contract LRCLongTermHoldingContract {
         uint lrcAmount = lrcToken
             .balanceOf(msg.sender)
             .min256(lrcToken.allowance(msg.sender, address(this)));
+
+        require(lrcAmount > 0);
 
         var record = records[msg.sender];
         record.lrcAmount += lrcAmount;
@@ -120,26 +109,21 @@ contract LRCLongTermHoldingContract {
 
     /// @dev Withdrawal all LRC.
     function withdrawLRC() payable {
-        require(msg.sender != owner);
         require(msg.value == 0);
         require(lrcDeposited > 0);
 
         var record = records[msg.sender];
-        require(now >= record.timestamp + LOCKDOWN_PERIOD);
+        require(now >= record.timestamp + WITHDRAWAL_DELAY);
         require(record.lrcAmount > 0);
 
-        var lrcToken = Token(lrcTokenAddress);
-        uint lrcAmount = lrcToken
-            .balanceOf(address(this))
-            .div(lrcDeposited)
-            .mul(record.lrcAmount);
+        uint lrcAmount = lrcBalance().div(lrcDeposited).mul(record.lrcAmount);
 
         require(lrcAmount > 0);
 
         delete records[msg.sender];
-        lrcDeposited -= lrcAmount;
+        lrcDeposited -= record.lrcAmount;
 
-        require(lrcToken.transfer(msg.sender, lrcAmount));
+        require(Token(lrcTokenAddress).transfer(msg.sender, lrcAmount));
         Withdrawal(withdrawId++, msg.sender, lrcAmount);
     }
 }

@@ -22,6 +22,7 @@ import './Token.sol';
 
 /// @title Mid-Team Holding Incentive Program
 /// @author Daniel Wang - <daniel@loopring.org>, Kongliang Zhong - <kongliang@loopring.org>.
+/// For more information, please visit https://loopring.org.
 contract LRCMidTermHoldingContract {
     using SafeMath for uint;
 
@@ -36,9 +37,9 @@ contract LRCMidTermHoldingContract {
     uint public constant WITHDRAWAL_DELAY               = 180 days;
     uint public constant WITHDRAWAL_WINDOW              = 90  days;
 
-    uint public constant MAX_LRC_DEPOSIT_PER_ADDRESS    = 150000 ether; // = 20 ETH
+    uint public constant MAX_LRC_DEPOSIT_PER_ADDRESS    = 150000 ether; // = 20 ETH * 7500
 
-    // 7500 LRC for 1 ETH. This rate is the best token sale rate ever.
+    // 7500 LRC for 1 ETH. This is the best token sale rate ever.
     uint public constant RATE       = 7500; 
 
     address public lrcTokenAddress  = 0x0;
@@ -65,7 +66,6 @@ contract LRCMidTermHoldingContract {
     /* 
      * EVENTS
      */
-
     /// Emitted for each sucuessful deposit.
     uint public depositId = 0;
     event Deposit(uint _depositId, address _addr, uint _ethAmount, uint _lrcAmount);
@@ -103,12 +103,13 @@ contract LRCMidTermHoldingContract {
     /// @dev Get back ETH to `owner`.
     /// @param ethAmount Amount of ETH to drain back to owner
     function drain(uint ethAmount) public payable {
-        require(ethAmount > 0);
+        require(!closed);
         require(msg.sender == owner);
-
+        
         uint amount = ethAmount.min256(this.balance);
-
+        require(amount > 0);
         require(owner.send(amount));
+
         Drained(amount);
     }
 
@@ -118,13 +119,13 @@ contract LRCMidTermHoldingContract {
         require(msg.sender == owner);
         require(now > depositStopTime + WITHDRAWAL_DELAY + WITHDRAWAL_WINDOW); 
 
-        var ethAmount = this.balance;
+        uint ethAmount = this.balance;
         if (ethAmount > 0) {
           require(owner.send(ethAmount));
         }
 
         var lrcToken = Token(lrcTokenAddress);
-        var lrcAmount = lrcToken.balanceOf(address(this));
+        uint lrcAmount = lrcToken.balanceOf(address(this));
         if (lrcAmount > 0) {
           require(lrcToken.transfer(owner, lrcAmount));
         }
@@ -150,18 +151,18 @@ contract LRCMidTermHoldingContract {
     /// the user's address and send `x * 100` ETH to the user.
     function depositLRC() payable {
         require(!closed && msg.sender != owner);
-        require(msg.value == 0);
         require(now <= depositStopTime);
+        require(msg.value == 0);
 
         var record = records[msg.sender];
         var lrcToken = Token(lrcTokenAddress);
 
-        var lrcAmount = this.balance.mul(RATE)
+        uint lrcAmount = this.balance.mul(RATE)
             .min256(lrcToken.balanceOf(msg.sender))
             .min256(lrcToken.allowance(msg.sender, address(this)))
             .min256(MAX_LRC_DEPOSIT_PER_ADDRESS - record.lrcAmount);
 
-        var ethAmount = lrcAmount.div(RATE);
+        uint ethAmount = lrcAmount.div(RATE);
         require(lrcAmount > 0 && ethAmount > 0);
 
         record.lrcAmount += lrcAmount;
@@ -171,8 +172,8 @@ contract LRCMidTermHoldingContract {
         lrcDeposited += lrcAmount;
         ethSent += ethAmount;
 
-        require(msg.sender.send(ethAmount));
         require(lrcToken.transferFrom(msg.sender, address(this), lrcAmount));
+        require(msg.sender.send(ethAmount));
 
         Deposit(
              depositId++,
@@ -185,16 +186,15 @@ contract LRCMidTermHoldingContract {
     /// @dev Withdrawal LRC with ETH transfer.
     function withdrawLRC() payable {
         require(!closed && msg.sender != owner);
-        require(msg.value > 0);
         require(now > depositStopTime);
+        require(msg.value > 0);
 
         var record = records[msg.sender];
         require(now >= record.timestamp + WITHDRAWAL_DELAY);
         require(now <= record.timestamp + WITHDRAWAL_DELAY + WITHDRAWAL_WINDOW);
 
         uint ethAmount = msg.value.min256(record.lrcAmount.div(RATE));
-
-        var lrcAmount = ethAmount.mul(RATE);
+        uint lrcAmount = ethAmount.mul(RATE);
 
         record.lrcAmount -= lrcAmount;
         if (record.lrcAmount == 0) {
@@ -206,8 +206,8 @@ contract LRCMidTermHoldingContract {
         lrcWithdrawn += lrcAmount;
         ethReceived += ethAmount;
 
-        require(owner.send(ethAmount));
         require(Token(lrcTokenAddress).transfer(msg.sender, lrcAmount));
+        require(owner.send(ethAmount));
 
         uint ethToReturn = msg.value - ethAmount;
         if (ethToReturn > 0) {
