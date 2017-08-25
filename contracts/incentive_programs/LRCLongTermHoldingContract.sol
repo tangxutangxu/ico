@@ -92,6 +92,10 @@ contract LRCLongTermHoldingContract {
         require(owner.send(this.balance));
     }
 
+    function lrcBalance() public constant returns (uint) {
+        return Token(lrcTokenAddress).balanceOf(address(this));
+    }
+
     /// @dev Deposit LRC for ETH.
     function depositLRC() payable {
         require(msg.sender != owner);
