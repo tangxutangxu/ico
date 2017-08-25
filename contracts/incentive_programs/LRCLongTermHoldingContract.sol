@@ -143,14 +143,12 @@ contract LRCLongTermHoldingContract {
     function getWithdrawalAmount(uint _lrcAmount) public constant returns (uint) {
         require(lrcDeposited > 0);
 
-        uint bonusRemained = lrcBalance() - lrcDeposited;
-        
+        uint balance = lrcBalance();
+       
         // The bonus is non-linear function to incentivize later withdrawal.
-        uint bonus = bonusRemained
-            .div(lrcDeposited).mul(_lrcAmount)
-            .div(lrcDeposited).mul(_lrcAmount);
+        uint bonus = (balance - lrcDeposited).div(lrcDeposited).mul(_lrcAmount);
 
-        return _lrcAmount + bonus;
+        return balance.min256(_lrcAmount + bonus);
     }
 }
 
