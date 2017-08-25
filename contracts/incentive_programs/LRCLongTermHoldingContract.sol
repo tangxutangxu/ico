@@ -33,7 +33,9 @@ contract LRCLongTermHoldingContract {
     // The bonus is this contract's last LRC balance, which can only increase, but not decrease.
     uint public constant WITHDRAWAL_DELAY           = 540 days; // = 1 year and 6 months
 
-    uint public constant WITHDRAWAL_SCALE           = 1000000; // 1ETH for withdrawal of 10,000,000 LRC.
+    // This implies a 0.001ETH fee per 10000 LRC partial withdrawal;
+    // for a once-for-all withdrawal, the fee is 0.
+    uint public constant WITHDRAWAL_SCALE           = 1E7; // 1ETH for withdrawal of 10,000,000 LRC.
     
     address public lrcTokenAddress  = 0x0;
 
