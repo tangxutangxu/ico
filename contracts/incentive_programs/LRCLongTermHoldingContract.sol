@@ -107,7 +107,7 @@ contract LRCLongTermHoldingContract {
         Deposit(depositId++, msg.sender, lrcAmount);
     }
 
-    /// @dev Withdrawal all LRC.
+    /// @dev Withdrawal all LRC for one address.
     function withdrawLRC() payable {
         require(msg.value == 0);
         require(lrcDeposited > 0);
@@ -116,7 +116,7 @@ contract LRCLongTermHoldingContract {
         require(now >= record.timestamp + WITHDRAWAL_DELAY);
         require(record.lrcAmount > 0);
 
-        uint lrcAmount = lrcBalance().div(lrcDeposited).mul(record.lrcAmount);
+        uint lrcAmount = getWithdrawalAmount(record.lrcAmount);
 
         require(lrcAmount > 0);
 
@@ -125,6 +125,19 @@ contract LRCLongTermHoldingContract {
 
         require(Token(lrcTokenAddress).transfer(msg.sender, lrcAmount));
         Withdrawal(withdrawId++, msg.sender, lrcAmount);
+    }
+
+    function getWithdrawalAmount(uint _lrcAmount) public constant returns (uint) {
+        require(lrcDeposited > 0);
+
+        uint bonusRemained = lrcBalance() - lrcDeposited;
+        
+        // The bonus is non-linear function to incentivize later withdrawal.
+        uint bonus = bonusRemained
+            .div(lrcDeposited).mul(_lrcAmount)
+            .div(lrcDeposited).mul(_lrcAmount);
+
+        return _lrcAmount + bonus;
     }
 }
 
