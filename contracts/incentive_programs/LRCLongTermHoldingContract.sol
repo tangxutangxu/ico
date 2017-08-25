@@ -32,6 +32,8 @@ contract LRCLongTermHoldingContract {
     // 18 months after deposit, user can withdrawal all its LRC with bonus.
     // The bonus is this contract's last LRC balance, which can only increase, but not decrease.
     uint public constant WITHDRAWAL_DELAY           = 540 days; // = 1 year and 6 months
+
+    uint public constant WITHDRAWAL_SCALE           = 1000000; // 1ETH for withdrawal of 10,000,000 LRC.
     
     address public lrcTokenAddress  = 0x0;
 
@@ -109,19 +111,28 @@ contract LRCLongTermHoldingContract {
 
     /// @dev Withdrawal all LRC for one address.
     function withdrawLRC() payable {
-        require(msg.value == 0);
         require(lrcDeposited > 0);
 
         var record = records[msg.sender];
         require(now >= record.timestamp + WITHDRAWAL_DELAY);
         require(record.lrcAmount > 0);
 
-        uint lrcAmount = getWithdrawalAmount(record.lrcAmount);
+        uint lrcWithdrawalBaseAmount = record.lrcAmount;
+        if (msg.value > 0) {
+            lrcWithdrawalBaseAmount = lrcWithdrawalBaseAmount
+                .min256(msg.value.mul(WITHDRAWAL_SCALE));
+        }
 
-        require(lrcAmount > 0);
+        uint lrcAmount = getWithdrawalAmount(lrcWithdrawalBaseAmount);
+        
+        lrcDeposited -= lrcWithdrawalBaseAmount;
+        record.lrcAmount -= lrcWithdrawalBaseAmount;
 
-        delete records[msg.sender];
-        lrcDeposited -= record.lrcAmount;
+        if (record.lrcAmount == 0) {
+            delete records[msg.sender];
+        } else {
+            records[msg.sender] = record;
+        }
 
         require(Token(lrcTokenAddress).transfer(msg.sender, lrcAmount));
         Withdrawal(withdrawId++, msg.sender, lrcAmount);
