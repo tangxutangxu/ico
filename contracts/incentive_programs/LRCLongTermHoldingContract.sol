@@ -44,9 +44,6 @@ contract LRCLongTermHoldingContract {
     uint public depositStartTime    = 0;
     uint public depositStopTime     = 0;
 
-    uint public depositIndex        = 0;
-    uint public withdrawIndex       = 0;
-
     struct Record {
         uint lrcAmount;
         uint timestamp;
@@ -59,10 +56,12 @@ contract LRCLongTermHoldingContract {
      */
 
     /// Emitted for each sucuessful deposit.
-    event Deposit(uint issueIndex, address addr, uint lrcAmount);
+    uint public depositId = 0;
+    event Deposit(uint _depositId, address _addr, uint _lrcAmount);
 
     /// Emitted for each sucuessful deposit.
-    event Withdrawal(uint issueIndex, address addr, uint lrcAmount);
+    uint public withdrawId = 0;
+    event Withdrawal(uint _withdrawId, address _addr, uint _lrcAmount);
 
     /// @dev Initialize the contract
     /// @param _lrcTokenAddress LRC ERC20 token address
@@ -104,9 +103,9 @@ contract LRCLongTermHoldingContract {
         require(now <= depositStopTime);
         
         var lrcToken = Token(lrcTokenAddress);
-        uint lrcAmount = lrcToken
-            .balanceOf(msg.sender)
-            .min256(msg.value.mul(FEE_FACTOR));
+        uint lrcAmount = msg.value.mul(FEE_FACTOR)
+            .min256(lrcToken.balanceOf(msg.sender))
+            .min256(lrcToken.allowance(msg.sender, address(this)));
 
         var record = records[msg.sender];
         record.lrcAmount += lrcAmount;
@@ -115,8 +114,8 @@ contract LRCLongTermHoldingContract {
 
         lrcDeposited += lrcAmount;
 
-        require(lrcToken.transfer(address(this), lrcAmount));
-        Deposit(depositIndex++, msg.sender, lrcAmount);
+        require(lrcToken.transferFrom(msg.sender, address(this), lrcAmount));
+        Deposit(depositId++, msg.sender, lrcAmount);
     }
 
     /// @dev Withdrawal all LRC.
@@ -136,14 +135,12 @@ contract LRCLongTermHoldingContract {
 
         require(lrcAmount > 0);
 
-        record.lrcAmount = 0;
-        records[msg.sender] = record;
-
+        delete records[msg.sender];
         lrcDeposited -= lrcAmount;
 
         require(lrcToken.transfer(msg.sender, lrcAmount));
 
-        Withdrawal(withdrawIndex++, msg.sender, lrcAmount);
+        Withdrawal(withdrawId++, msg.sender, lrcAmount);
     }
 }
 

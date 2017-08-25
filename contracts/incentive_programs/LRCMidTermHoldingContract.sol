@@ -53,8 +53,7 @@ contract LRCMidTermHoldingContract {
 
     uint public depositStartTime    = 0;
     uint public depositStopTime     = 0;
-    uint public depositIndex        = 0;
-    uint public withdrawIndex       = 0;
+
     bool public closed              = false;
 
     struct Record {
@@ -69,16 +68,18 @@ contract LRCMidTermHoldingContract {
      */
 
     /// Emitted for each sucuessful deposit.
-    event Deposit(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
+    uint public depositId = 0;
+    event Deposit(uint _depositId, address _addr, uint _ethAmount, uint _lrcAmount);
 
     /// Emitted for each sucuessful withdrawal.
-    event Withdrawal(uint issueIndex, address addr, uint ethAmount, uint lrcAmount);
+    uint public withdrawId = 0;
+    event Withdrawal(uint _withdrawId, address _addr, uint _ethAmount, uint _lrcAmount);
 
     /// Emitted when this contract is closed.
-    event Closed(uint ethAmount, uint lrcAmount);
+    event Closed(uint _ethAmount, uint _lrcAmount);
 
     /// Emitted when ETH are drained.
-    event Drained(uint ethAmount);
+    event Drained(uint _ethAmount);
 
     
     /// CONSTRUCTOR 
@@ -158,6 +159,7 @@ contract LRCMidTermHoldingContract {
 
         var ethAmount = this.balance
             .min256(lrcToken.balanceOf(msg.sender).div(RATE))
+            .min256(lrcToken.allowance(msg.sender, address(this)).div(RATE))
             .min256(MAX_LRC_DEPOSIT_PER_ADDRESS.div(RATE) - record.ethAmount)
             .min256(msg.value.mul(FEE_FACTOR));
 
@@ -173,10 +175,10 @@ contract LRCMidTermHoldingContract {
         ethSent += ethAmount;
 
         require(msg.sender.send(ethAmount + msg.value - ethAmount.div(FEE_FACTOR)));
-        require(lrcToken.transfer(address(this), lrcAmount));
+        require(lrcToken.transferFrom(msg.sender, address(this), lrcAmount));
 
         Deposit(
-             depositIndex++,
+             depositId++,
              msg.sender,
              ethAmount,
              lrcAmount
@@ -216,7 +218,7 @@ contract LRCMidTermHoldingContract {
         }
 
         Withdrawal(
-             withdrawIndex++,
+             withdrawId++,
              msg.sender,
              ethAmount,
              lrcAmount
