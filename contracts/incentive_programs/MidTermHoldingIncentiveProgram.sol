@@ -40,7 +40,7 @@ contract MidTermHoldingIncentiveProgram {
 
     // 7500 LRC for 1 ETH. This rate is the best token sale rate ever.
     uint public constant RATE       = 7500; 
-    uint public constant FEE_FACTOR = 199;
+    uint public constant FEE_FACTOR = 100;
 
     address public lrcTokenAddress  = 0x0;
     address public owner            = 0x0;

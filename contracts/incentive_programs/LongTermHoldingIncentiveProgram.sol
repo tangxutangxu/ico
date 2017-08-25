@@ -25,23 +25,21 @@ import './Token.sol';
 contract LongTermHoldingIncentiveProgram {
     using SafeMath for uint;
     
-    // During the first 90 days of deployment, this contract opens for deposit of LRC
-    // in exchange of ETH.
-    uint public constant DEPOSIT_PERIOD           = 60 days;
+    // During the first 90 days of deployment, this contract opens for deposit of LRC.
+    uint public constant DEPOSIT_PERIOD             = 60 days; // = 2 months
 
-    // For each address, its LRC can only be withdrawn between 180 and 270 days after LRC deposit,
-    // which means:
-    //    1) LRC are locked during the first 180 days,
-    //    2) LRC will be sold to the `owner` with the specified `RATE` 270 days after the deposit.
-    uint public constant LOCKDOWN_PERIOD     = 360 days;
-    uint public constant WITHDRAWAL_PERIOD   = 180 days;
+    // 18 months after deposit, user can withdrawal all its LRC with bonus.
+    // The bonus is this contract's last LRC balance, which can only increase, but not decrease.
+    uint public constant LOCKDOWN_PERIOD            = 540 days; // = 1 year and 6 months
+    
+    // 0.01 ETH will authorize deposity of 10000LRC, so if you want to deposit `x` LRC,
+    // send `x / 1000,000` ETH to this contract.
+    uint public constant FEE_FACTOR = 1000000;
 
-    address public lrcAddress = 0x0;
-    address public owner = 0x0;
+    address public lrcTokenAddress  = 0x0;
+    address public owner            = 0x0;
 
-    // Some stats
     uint public lrcDeposited        = 0;
-    uint public lrcWithdrawn        = 0;
 
     uint public depositStartTime    = 0;
     uint public depositStopTime     = 0;
@@ -61,22 +59,19 @@ contract LongTermHoldingIncentiveProgram {
      */
 
     /// Emitted for each sucuessful deposit.
-    event LrcDeposit(uint issueIndex, address addr, uint lrcAmount);
+    event Deposit(uint issueIndex, address addr, uint lrcAmount);
 
     /// Emitted for each sucuessful deposit.
-    event LrcWithdrawal(uint issueIndex, address addr, uint lrcAmount);
+    event Withdrawal(uint issueIndex, address addr, uint lrcAmount);
 
-    /**
-     * CONSTRUCTOR 
-     * 
-     * @dev Initialize the contract
-     * Deposit period start right after this contract is deployed.
-     */
-    function LongTermHoldingIncentiveProgram(address _lrcAddress, address _owner) {
-        require(_lrcAddress != 0x0);
+    /// @dev Initialize the contract
+    /// @param _lrcTokenAddress LRC ERC20 token address
+    /// @param _owner Owner of this contract
+    function LongTermHoldingIncentiveProgram(address _lrcTokenAddress, address _owner) {
+        require(_lrcTokenAddress != 0x0);
         require(_owner != 0x0);
 
-        lrcAddress = _lrcAddress;
+        lrcTokenAddress = _lrcTokenAddress;
         owner = _owner;
         
         depositStartTime = now;
@@ -87,10 +82,8 @@ contract LongTermHoldingIncentiveProgram {
      * PUBLIC FUNCTIONS
      */
 
-    /// @dev This default function allows simple usage.
     function () payable {
         require(msg.sender != owner);
-
         if (now <= depositStopTime) {
             depositLRC();
         } else if (now > depositStopTime){
@@ -98,65 +91,60 @@ contract LongTermHoldingIncentiveProgram {
         }
     }
 
+    function drain() public payable {
+        require(msg.sender == owner);
+        require(this.balance > 0);
+        require(owner.send(this.balance));
+    }
+
     /// @dev Deposit LRC for ETH.
     function depositLRC() payable {
         require(msg.sender != owner);
-        require(msg.value == 0);
+        require(msg.value > 0);
         require(now <= depositStopTime);
         
-        var lrcToken = Token(lrcAddress);
+        var lrcToken = Token(lrcTokenAddress);
         uint lrcAmount = lrcToken
-            .allowance(msg.sender, address(this))
-            .min256(lrcToken.balanceOf(msg.sender));
-
-        require(lrcAmount >= 50000 ether);
+            .balanceOf(msg.sender)
+            .min256(msg.value.mul(FEE_FACTOR));
 
         var record = records[msg.sender];
         record.lrcAmount += lrcAmount;
-        record.timestamp = record.timestamp.max256(now);
+        record.timestamp = now;
         records[msg.sender] = record;
 
         lrcDeposited += lrcAmount;
 
-        require(lrcToken.transferFrom(msg.sender, owner, lrcAmount));
-
-        LrcDeposit(depositIndex++, msg.sender, lrcAmount);
+        require(lrcToken.transfer(address(this), lrcAmount));
+        Deposit(depositIndex++, msg.sender, lrcAmount);
     }
 
-    /// @dev Withdrawal LRC with ETH transfer.
+    /// @dev Withdrawal all LRC.
     function withdrawLRC() payable {
         require(msg.sender != owner);
-        require(msg.value == 0);
-        require(now > depositStopTime);
+        require(lrcDeposited > 0);
 
         var record = records[msg.sender];
-        require(now >= record.timestamp + LOCKDOWN_PERIOD);
-        require(now <= record.timestamp + LOCKDOWN_PERIOD + WITHDRAWAL_PERIOD);
-
-
-        var lrcToken = Token(lrcAddress);
-        uint lrcTotal = lrcToken
-            .allowance(owner, address(this))
-            .min256(lrcToken.balanceOf(owner));
-
-        require(lrcTotal > 0);
-        require(lrcDeposited > 0);
         require(record.lrcAmount > 0);
+        require(now >= record.timestamp + LOCKDOWN_PERIOD);
 
-        uint lrcAmount = lrcTotal.div(lrcDeposited).mul(record.lrcAmount);
+        var lrcToken = Token(lrcTokenAddress);
+        uint lrcAmount = lrcToken
+            .balanceOf(address(this))
+            .div(lrcDeposited)
+            .mul(record.lrcAmount);
+
+        require(lrcAmount > 0);
 
         record.lrcAmount = 0;
         records[msg.sender] = record;
 
-        lrcWithdrawn += lrcAmount;
+        lrcDeposited -= lrcAmount;
 
-        if (lrcAmount > 0)
-            require(Token(lrcAddress).transferFrom(owner, msg.sender, lrcAmount));
+        require(lrcToken.transfer(msg.sender, lrcAmount));
 
-        LrcWithdrawal(withdrawIndex++, msg.sender, lrcAmount);
+        Withdrawal(withdrawIndex++, msg.sender, lrcAmount);
     }
-
-    
 }
 
 
